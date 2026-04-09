@@ -558,7 +558,7 @@
     flex-wrap: wrap;
     gap: 16px;
     align-items: center;
-    margin: 4px 0 24px;
+    margin: 20px 0 24px;
     padding: 12px 14px;
     background: var(--bg-2);
     border: 1px solid var(--border);
@@ -836,7 +836,7 @@
           <label>Plazo (meses)</label>
           <input type="number" data-sc="A" data-key="plazo" value="12" />
           <label>Tasa anual (%)</label>
-          <input type="number" data-sc="A" data-key="tasa" value="35" step="0.5" />
+          <input type="number" data-sc="A" data-key="tasa" value="65" step="0.5" />
         </div>
         <div class="scenario-result">
           <div class="row"><span>Cuota</span><strong id="A_cuota">—</strong></div>
@@ -870,12 +870,6 @@
   <section class="card inflation-module" id="inflationModule">
     <h2>Tasa vs Inflación</h2>
     <div class="card-sub">Compará tu tasa con el ritmo al que suben los precios. Así sabés si el crédito es caro o barato en <em>términos reales</em>.</div>
-
-    <!-- Inline API status notice (hidden until needed) -->
-    <div class="infla-api-notice" id="inflaApiNotice" hidden>
-      <span id="inflaApiMsg">No se pudieron obtener datos de inflación.</span>
-      <button class="infla-retry-btn" id="inflaRetryBtn" type="button">Reintentar</button>
-    </div>
 
     <div class="infla-header">
       <div>
@@ -1119,96 +1113,66 @@
   }
   document.querySelectorAll('input[data-sc]').forEach(i => i.addEventListener("input", renderInsight));
 
+  // -- INFLATION_DATA:START --
+  // Generated 2026-04-09 — run `node fetch-inflation.js` to update
+  const INFLATION_CACHED = [
+    {
+      "fecha": "2025-03-31",
+      "valor": 3.7
+    },
+    {
+      "fecha": "2025-04-30",
+      "valor": 2.8
+    },
+    {
+      "fecha": "2025-05-31",
+      "valor": 1.5
+    },
+    {
+      "fecha": "2025-06-30",
+      "valor": 1.6
+    },
+    {
+      "fecha": "2025-07-31",
+      "valor": 1.9
+    },
+    {
+      "fecha": "2025-08-31",
+      "valor": 1.9
+    },
+    {
+      "fecha": "2025-09-30",
+      "valor": 2.1
+    },
+    {
+      "fecha": "2025-10-31",
+      "valor": 2.3
+    },
+    {
+      "fecha": "2025-11-30",
+      "valor": 2.5
+    },
+    {
+      "fecha": "2025-12-31",
+      "valor": 2.8
+    },
+    {
+      "fecha": "2026-01-31",
+      "valor": 2.9
+    },
+    {
+      "fecha": "2026-02-28",
+      "valor": 2.9
+    }
+  ];
+  const INFLATION_CACHE_DATE = "2026-04-09";
+  // -- INFLATION_DATA:END --
+
   // ---------- Inflation module ----------
-  const INFLATION_API = "https://api.argentinadatos.com/v1/finanzas/indices/inflacionInteranual";
-  const INFLATION_MONTHLY_API = "https://api.argentinadatos.com/v1/finanzas/indices/inflacion";
-  const CACHE_KEY = "sim-credito:inflacion-cache";
-  const CACHE_KEY_MONTHLY = "sim-credito:inflacion-mensual-cache";
   let inflationState = null;        // { valor, fecha } interanual
   let inflationMonthly = null;      // { annualized, fechaDesde, fechaHasta } 6m anualizada
-  let inflationMode = "manual";     // "yoy" | "6m" | "manual" — starts in manual until API loads
+  let inflationMode = "manual";     // "yoy" | "6m" | "manual"
   let manualInflation = 100;        // % anual, user-editable
-
-  function readCache(key = CACHE_KEY) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  }
-  function writeCache(data, key = CACHE_KEY) {
-    try {
-      localStorage.setItem(key, JSON.stringify({
-        ...data,
-        lastRefresh: new Date().toISOString()
-      }));
-    } catch {}
-  }
-  function shouldRefresh(cached) {
-    if (!cached) return true;
-    const now = new Date();
-    const day15 = new Date(now.getFullYear(), now.getMonth(), 15);
-    const lastRefresh = new Date(cached.lastRefresh);
-    // Refresh only when we're past day-15 of the current month AND
-    // the last refresh happened before day-15 of the current month.
-    // This guarantees at most one API call per month, right after
-    // INDEC publishes new data.
-    return now >= day15 && lastRefresh < day15;
-  }
-  async function fetchInflation() {
-    const res = await fetch(INFLATION_API, { headers: { "Accept": "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) throw new Error("Empty response");
-    const last = data[data.length - 1];
-    return { valor: Number(last.valor), fecha: last.fecha };
-  }
-  async function getInflation() {
-    const cached = readCache();
-    if (!shouldRefresh(cached)) {
-      return { valor: cached.valor, fecha: cached.fecha };
-    }
-    try {
-      const fresh = await fetchInflation();
-      writeCache(fresh);
-      return fresh;
-    } catch (err) {
-      console.warn("Inflation fetch failed:", err);
-      // Fallback to whatever we have, even if stale
-      if (cached) return { valor: cached.valor, fecha: cached.fecha };
-      throw err;
-    }
-  }
-
-  async function fetchMonthlyInflation() {
-    const res = await fetch(INFLATION_MONTHLY_API, { headers: { "Accept": "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length < 6) throw new Error("Not enough monthly data");
-    const last6 = data.slice(-6);
-    // Compound: product of (1 + m/100) over 6 months, then annualize: ^(12/6)
-    const prod = last6.reduce((acc, row) => acc * (1 + Number(row.valor) / 100), 1);
-    const annualized = (Math.pow(prod, 12 / 6) - 1) * 100;
-    return {
-      annualized,
-      fechaDesde: last6[0].fecha,
-      fechaHasta: last6[last6.length - 1].fecha
-    };
-  }
-  async function getMonthlyInflation() {
-    const cached = readCache(CACHE_KEY_MONTHLY);
-    if (!shouldRefresh(cached)) {
-      return { annualized: cached.annualized, fechaDesde: cached.fechaDesde, fechaHasta: cached.fechaHasta };
-    }
-    try {
-      const fresh = await fetchMonthlyInflation();
-      writeCache(fresh, CACHE_KEY_MONTHLY);
-      return fresh;
-    } catch (err) {
-      console.warn("Monthly inflation fetch failed:", err);
-      if (cached) return { annualized: cached.annualized, fechaDesde: cached.fechaDesde, fechaHasta: cached.fechaHasta };
-      throw err;
-    }
-  }
 
   function formatInflaDate(isoDate) {
     // "2026-02-28" -> "feb 2026"
@@ -1233,7 +1197,7 @@
         dateText: `Proyección · ${formatInflaDate(inflationMonthly.fechaDesde)} → ${formatInflaDate(inflationMonthly.fechaHasta)}`
       };
     }
-    // yoy (default)
+    // yoy
     if (!inflationState) return null;
     return {
       valor: inflationState.valor,
@@ -1285,54 +1249,38 @@
     verdictEl.innerHTML = msg;
   }
 
-  async function initInflation() {
-    const notice = document.getElementById("inflaApiNotice");
-    const msg = document.getElementById("inflaApiMsg");
-    notice.hidden = true;
-    try {
-      inflationState = await getInflation();
-      // Switch to YoY mode now that we have real data
-      inflationMode = "yoy";
-      document.getElementById("inflaMode_manual").checked = false;
-      document.getElementById("inflaMode_yoy").checked = true;
-      inflaManualWrap.classList.remove("active");
-      renderInflationModule();
-    } catch (err) {
-      console.warn("Inflation module unavailable:", err);
-      // Stay in manual mode — module is already visible and functional
-      msg.textContent = "No se pudieron obtener datos de inflación en este momento.";
-      notice.hidden = false;
-    }
-  }
-
-  document.getElementById("inflaRetryBtn").addEventListener("click", () => {
-    // Reset caches so getInflation does a real fetch
-    try { localStorage.removeItem(CACHE_KEY); } catch {}
-    initInflation();
-  });
-
   // Mode selector wiring
   const inflaManualWrap = document.getElementById("inflaManualWrap");
   const inflaManualInput = document.getElementById("inflaManualInput");
 
-  async function setInflationMode(mode) {
+  function setInflationMode(mode) {
     inflationMode = mode;
     inflaManualWrap.classList.toggle("active", mode === "manual");
+    renderInflationModule();
+  }
 
-    if (mode === "6m" && !inflationMonthly) {
-      // Show a quick loading hint in the value field
-      document.getElementById("inflaValue").textContent = "…";
-      document.getElementById("inflaDate").textContent = "Calculando últimos 6 meses…";
-      try {
-        inflationMonthly = await getMonthlyInflation();
-      } catch (err) {
-        console.warn("Could not load monthly inflation, reverting to interanual:", err);
-        document.getElementById("inflaDate").textContent = "No se pudo obtener inflación mensual.";
-        // Revert UI to yoy
-        document.getElementById("inflaMode_yoy").checked = true;
-        inflationMode = "yoy";
-      }
+  function initInflation(data) {
+    if (!data || !Array.isArray(data) || data.length === 0) return;
+    // YoY: compound last 12 months
+    const last12 = data.slice(-12);
+    const yoyProd = last12.reduce((acc, row) => acc * (1 + Number(row.valor) / 100), 1);
+    const last = data[data.length - 1];
+    inflationState = { valor: (yoyProd - 1) * 100, fecha: last.fecha };
+    // 6m annualized: last 6 entries
+    if (data.length >= 6) {
+      const last6 = data.slice(-6);
+      const prod = last6.reduce((acc, row) => acc * (1 + Number(row.valor) / 100), 1);
+      inflationMonthly = {
+        annualized: (Math.pow(prod, 12 / 6) - 1) * 100,
+        fechaDesde: last6[0].fecha,
+        fechaHasta: last6[last6.length - 1].fecha
+      };
     }
+    // Switch to YoY mode now that we have real data
+    inflationMode = "yoy";
+    document.getElementById("inflaMode_manual").checked = false;
+    document.getElementById("inflaMode_yoy").checked = true;
+    inflaManualWrap.classList.remove("active");
     renderInflationModule();
   }
 
@@ -1394,8 +1342,8 @@
   // ---------- Init ----------
   update();
   renderInsight();
-  renderInflationModule(); // Render immediately in manual mode — no network wait
-  initInflation();         // Fetch in background; upgrades to real data on success
+  renderInflationModule();
+  if (typeof INFLATION_CACHED !== "undefined") initInflation(INFLATION_CACHED);
 </script>
 </body>
 </html>
