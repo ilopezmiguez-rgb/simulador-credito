@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simulador de Crédito Transparente</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1220;
+    --bg-2: #111a2e;
+    --card: #15203a;
+    --card-2: #1b2746;
+    --border: #243154;
+    --text: #e8eefc;
+    --muted: #8a96b4;
+    --primary: #5b8cff;
+    --primary-600: #3f72ff;
+    --accent: #2dd4bf;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --capital: #5b8cff;
+    --interes: #2dd4bf;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+  a { color: var(--primary); text-decoration: none; }
+
+  .topbar {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0c1426 0%, var(--bg) 100%);
+  }
+  .topbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 600; }
+  .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .brand-sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(45, 212, 191, .12);
+    color: var(--accent);
+    border: 1px solid rgba(45, 212, 191, .3);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+  }
+
+  .hero {
+    margin-bottom: 24px;
+  }
+  .hero h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    letter-spacing: -0.5px;
+  }
+  .hero p {
+    margin: 0;
+    color: var(--muted);
+    max-width: 720px;
+    line-height: 1.55;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 920px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    letter-spacing: .2px;
+  }
+  .card .card-sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+
+  .field { margin-bottom: 18px; }
+  .field-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .field label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .field .value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bg-2);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 3px solid #0b1220;
+    cursor: pointer;
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 3px solid #0b1220;
+    cursor: pointer;
+  }
+  input[type="number"] {
+    width: 110px;
+    padding: 9px 12px;
+    background: var(--bg-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    text-align: right;
+  }
+  input[type="number"]:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+  .results {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  @media (max-width: 520px) { .results { grid-template-columns: 1fr; } }
+  .result-tile {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .result-tile.primary {
+    background: linear-gradient(135deg, rgba(91,140,255,.18), rgba(45,212,191,.12));
+    border-color: rgba(91,140,255,.4);
+  }
+  .result-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 6px;
+  }
+  .result-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+  }
+  .result-tile small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .chart-wrap {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 18px;
+    align-items: center;
+  }
+  @media (max-width: 600px) { .chart-row { grid-template-columns: 1fr; } }
+  .legend { font-size: 13px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  .cta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 13px 22px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .05s ease, background .2s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    flex: 1;
+    min-width: 200px;
+  }
+  .btn-primary:hover { background: var(--primary-600); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: var(--bg-2); }
+
+  /* Comparator */
+  .comparator { margin-top: 20px; }
+  .scenarios {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 720px) { .scenarios { grid-template-columns: 1fr; } }
+  .scenario {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .scenario h3 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tag {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    text-align: center;
+    line-height: 22px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .tag.A { background: rgba(91,140,255,.2); color: var(--primary); }
+  .tag.B { background: rgba(45,212,191,.2); color: var(--accent); }
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 90px;
+    gap: 8px 10px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .scenario-grid label { color: var(--muted); }
+  .scenario-grid input {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: right;
+  }
+  .scenario-result {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+    font-size: 13px;
+  }
+  .scenario-result .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .scenario-result .row strong { color: var(--text); }
+  .scenario-result .row span { color: var(--muted); }
+
+  .insight {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(251, 191, 36, .08);
+    border: 1px solid rgba(251, 191, 36, .25);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .insight strong { color: var(--warn); }
+
+  /* Explanation mode */
+  .explain-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch {
+    position: relative;
+    width: 40px; height: 22px;
+    background: var(--bg-2);
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    transition: background .2s;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: transform .2s, background .2s;
+  }
+  .explain-toggle input { display: none; }
+  .explain-toggle input:checked + .switch { background: rgba(91,140,255,.3); border-color: var(--primary); }
+  .explain-toggle input:checked + .switch::after { transform: translateX(18px); background: var(--primary); }
+
+  .explanations {
+    display: none;
+    margin-top: 14px;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .explanations.active { display: grid; }
+  @media (max-width: 720px) { .explanations { grid-template-columns: 1fr; } }
+  .explain-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .explain-card h4 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--primary);
+  }
+  .explain-card p { margin: 0; color: var(--muted); }
+
+  /* Inflation module */
+  .inflation-module { margin-top: 20px; }
+  .infla-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .infla-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+  }
+  .infla-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+    color: var(--text);
+  }
+  .infla-date {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .infla-source {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-2);
+  }
+
+  .comparison-bar-wrap {
+    margin: 60px 0 24px;
+  }
+  .comparison-bar {
+    position: relative;
+    height: 8px;
+    margin: 0 12px;
+  }
+  .bar-track {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(45,212,191,.4) 0%, rgba(251,191,36,.4) 50%, rgba(248,113,113,.4) 100%);
+    border-radius: 999px;
+  }
+  .marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    transition: left .25s ease;
+  }
+  .marker-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 0 2px currentColor, 0 4px 12px rgba(0,0,0,.3);
+  }
+  .marker-tna { color: var(--primary); }
+  .marker-tna .marker-dot { background: var(--primary); }
+  .marker-infla { color: var(--accent); }
+  .marker-infla .marker-dot { background: var(--accent); }
+  .marker-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.3;
+  }
+  .marker-label strong { color: var(--text); font-size: 13px; }
+  .marker-tna .marker-label { top: 22px; }
+  .marker-infla .marker-label { bottom: 22px; }
+
+  .bar-scale {
+    display: flex;
+    justify-content: space-between;
+    margin: 14px 12px 0;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .verdict {
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+  }
+  .verdict.green {
+    background: rgba(45, 212, 191, .08);
+    border-color: rgba(45, 212, 191, .3);
+  }
+  .verdict.yellow {
+    background: rgba(251, 191, 36, .08);
+    border-color: rgba(251, 191, 36, .3);
+  }
+  .verdict.red {
+    background: rgba(248, 113, 113, .08);
+    border-color: rgba(248, 113, 113, .3);
+  }
+  .verdict strong { color: var(--text); }
+
+  /* Inflation mode selector */
+  .infla-mode {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    margin: 4px 0 24px;
+    padding: 12px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .infla-mode-group {
+    display: inline-flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px;
+  }
+  .infla-mode-group input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .infla-mode-group label {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+    user-select: none;
+  }
+  .infla-mode-group input[type="radio"]:checked + label {
+    background: var(--primary);
+    color: #fff;
+  }
+  .infla-manual-wrap {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .infla-manual-wrap.active { display: inline-flex; }
+  .infla-manual-wrap input {
+    width: 80px;
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  /* PM footer */
+  .pm-note {
+    margin-top: 28px;
+    padding: 18px 22px;
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .pm-note h3 {
+    margin: 0 0 8px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .pm-note ul { margin: 6px 0 0; padding-left: 18px; }
+  .pm-note li { margin-bottom: 3px; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--card-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 18px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="logo">$</div>
+      <div>
+        <div>Crédito Claro</div>
+        <div class="brand-sub">Simulador transparente · MVP</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="hero">
+    <h1>Tomá decisiones informadas con total claridad sobre tu crédito</h1>
+    <p>Simulá tu préstamo, entendé el costo real, y compará escenarios antes de solicitar. Sin letra chica.</p>
+  </section>
+
+  <div class="grid">
+    <!-- Simulator -->
+    <section class="card">
+      <h2>Simulador</h2>
+      <div class="card-sub">Ajustá los valores y mirá el resultado en tiempo real.</div>
+
+      <div class="field">
+        <div class="field-row">
+          <label for="monto">Monto a solicitar</label>
+          <span class="value" id="montoLabel">$ 500.000</span>
+        </div>
+        <div class="input-row">
+          <input type="range" id="montoRange" min="50000" max="5000000" step="10000" value="500000" />
+          <input type="number" id="monto" min="10000" step="10000" value="500000" />
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-row">
+          <label for="plazo">Plazo</label>
+          <span class="value" id="plazoLabel">12 meses</span>
+        </div>
+        <div class="input-row">
+          <input type="range" id="plazoRange" min="3" max="60" step="1" value="12" />
+          <input type="number" id="plazo" min="1" max="120" step="1" value="12" />
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-row">
+          <label for="tasa">Tasa de interés anual (TNA)</label>
+          <span class="value" id="tasaLabel">65%</span>
+        </div>
+        <div class="input-row">
+          <input type="range" id="tasaRange" min="10" max="200" step="0.5" value="65" />
+          <input type="number" id="tasa" min="0" max="500" step="0.5" value="65" />
+        </div>
+      </div>
+
+      <div class="results">
+        <div class="result-tile primary">
+          <div class="result-label">Cuota mensual</div>
+          <div class="result-value" id="cuotaOut">—</div>
+          <small>Sistema francés (cuota fija)</small>
+        </div>
+        <div class="result-tile">
+          <div class="result-label">Costo total</div>
+          <div class="result-value" id="totalOut">—</div>
+          <small>Capital + intereses</small>
+        </div>
+        <div class="result-tile">
+          <div class="result-label">Intereses</div>
+          <div class="result-value" id="interesOut">—</div>
+          <small id="interesPctOut">— sobre el capital</small>
+        </div>
+      </div>
+
+      <div class="cta">
+        <button class="btn btn-ghost" id="resetBtn">Reiniciar</button>
+      </div>
+    </section>
+
+    <!-- Visualization + Explanation -->
+    <section class="card">
+      <h2>Composición del costo</h2>
+      <div class="card-sub">Cuánto pagás de capital vs. cuánto de intereses.</div>
+
+      <div class="chart-wrap">
+        <div class="chart-row">
+          <div style="position: relative; height: 180px;">
+            <canvas id="doughnutChart"></canvas>
+          </div>
+          <div class="legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--capital)"></span>
+              <span>Capital: <strong id="legendCapital">—</strong></span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--interes)"></span>
+              <span>Intereses: <strong id="legendInteres">—</strong></span>
+            </div>
+            <div class="legend-item" style="color: var(--muted); margin-top: 10px;">
+              Por cada $100 que recibís, devolvés $<span id="ratio100">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <label class="explain-toggle">
+        <input type="checkbox" id="explainToggle" />
+        <span class="switch"></span>
+        <span>Modo explicación</span>
+      </label>
+
+      <div class="explanations" id="explanations">
+        <div class="explain-card">
+          <h4>¿Qué es la cuota?</h4>
+          <p>Es el monto fijo que pagás cada mes. Incluye una parte de devolución del dinero prestado (capital) y los intereses por usarlo.</p>
+        </div>
+        <div class="explain-card">
+          <h4>¿Qué es la TNA?</h4>
+          <p>Tasa Nominal Anual: el costo del crédito expresado por año. Para calcular la mensual la dividimos entre 12.</p>
+        </div>
+        <div class="explain-card">
+          <h4>¿Por qué pago más que el monto?</h4>
+          <p>Porque pagás intereses por el tiempo que usás el dinero. A mayor plazo, más intereses, aunque la cuota sea menor.</p>
+        </div>
+        <div class="explain-card">
+          <h4>Sistema francés</h4>
+          <p>Las cuotas son iguales todos los meses. Al principio pagás más interés y menos capital; al final, al revés.</p>
+        </div>
+        <div class="explain-card">
+          <h4>¿Qué es la tasa real?</h4>
+          <p>Es la tasa de interés menos la inflación. Si tu crédito tiene 60% anual y los precios suben 100% al año, en términos reales estás pagando menos de lo que recibiste. Mirar solo la tasa nominal puede engañar.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Comparator -->
+  <section class="card comparator">
+    <h2>Comparador de escenarios</h2>
+    <div class="card-sub">Probá dos combinaciones y mirá la diferencia real.</div>
+
+    <div class="scenarios">
+      <div class="scenario">
+        <h3><span class="tag A">A</span> Escenario A</h3>
+        <div class="scenario-grid">
+          <label>Monto</label>
+          <input type="number" data-sc="A" data-key="monto" value="500000" />
+          <label>Plazo (meses)</label>
+          <input type="number" data-sc="A" data-key="plazo" value="12" />
+          <label>Tasa anual (%)</label>
+          <input type="number" data-sc="A" data-key="tasa" value="65" step="0.5" />
+        </div>
+        <div class="scenario-result">
+          <div class="row"><span>Cuota</span><strong id="A_cuota">—</strong></div>
+          <div class="row"><span>Costo total</span><strong id="A_total">—</strong></div>
+          <div class="row"><span>Intereses</span><strong id="A_interes">—</strong></div>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <h3><span class="tag B">B</span> Escenario B</h3>
+        <div class="scenario-grid">
+          <label>Monto</label>
+          <input type="number" data-sc="B" data-key="monto" value="500000" />
+          <label>Plazo (meses)</label>
+          <input type="number" data-sc="B" data-key="plazo" value="24" />
+          <label>Tasa anual (%)</label>
+          <input type="number" data-sc="B" data-key="tasa" value="65" step="0.5" />
+        </div>
+        <div class="scenario-result">
+          <div class="row"><span>Cuota</span><strong id="B_cuota">—</strong></div>
+          <div class="row"><span>Costo total</span><strong id="B_total">—</strong></div>
+          <div class="row"><span>Intereses</span><strong id="B_interes">—</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight" id="insight">—</div>
+  </section>
+
+  <!-- Inflation module -->
+  <section class="card inflation-module" id="inflationModule" hidden>
+    <h2>Tasa vs Inflación</h2>
+    <div class="card-sub">Compará tu tasa con el ritmo al que suben los precios. Así sabés si el crédito es caro o barato en <em>términos reales</em>.</div>
+
+    <div class="infla-header">
+      <div>
+        <div class="infla-label" id="inflaLabel">Inflación interanual</div>
+        <div class="infla-value" id="inflaValue">—</div>
+        <div class="infla-date" id="inflaDate">—</div>
+      </div>
+      <div class="infla-source" id="inflaSource">Fuente: ArgentinaDatos · INDEC</div>
+    </div>
+
+    <div class="infla-mode" role="group" aria-label="Fuente de la inflación">
+      <div class="infla-mode-group">
+        <input type="radio" name="inflaMode" id="inflaMode_yoy" value="yoy" checked>
+        <label for="inflaMode_yoy">Interanual</label>
+        <input type="radio" name="inflaMode" id="inflaMode_6m" value="6m">
+        <label for="inflaMode_6m">Anualizada 6m</label>
+        <input type="radio" name="inflaMode" id="inflaMode_manual" value="manual">
+        <label for="inflaMode_manual">Manual</label>
+      </div>
+      <div class="infla-manual-wrap" id="inflaManualWrap">
+        <span>Inflación anual:</span>
+        <input type="number" id="inflaManualInput" min="0" max="1000" step="0.1" value="100">
+        <span>%</span>
+      </div>
+    </div>
+
+    <div class="comparison-bar-wrap">
+      <div class="comparison-bar" id="comparisonBar">
+        <div class="bar-track"></div>
+        <div class="marker marker-tna" id="markerTna">
+          <div class="marker-dot"></div>
+          <div class="marker-label">TNA<br><strong id="markerTnaLabel">—</strong></div>
+        </div>
+        <div class="marker marker-infla" id="markerInfla">
+          <div class="marker-dot"></div>
+          <div class="marker-label">Inflación<br><strong id="markerInflaLabel">—</strong></div>
+        </div>
+      </div>
+      <div class="bar-scale">
+        <span>0%</span>
+        <span id="barScaleMax">—</span>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict">—</div>
+  </section>
+
+  <!-- Inflation fallback (shown only if API unreachable and no cache) -->
+  <section class="card inflation-module fallback" id="inflationFallback" hidden>
+    <h2>Tasa vs Inflación</h2>
+    <div class="card-sub" style="margin-bottom:0;">Datos de inflación no disponibles en este momento. Volvé a intentar más tarde.</div>
+  </section>
+
+  <section class="pm-note">
+    <h3>Nota del producto · contexto PM</h3>
+    Este simulador es un MVP construido para validar la hipótesis de que <em>mayor transparencia en el costo del crédito incrementa la conversión a solicitud</em>.
+    <ul>
+      <li><strong>North Star:</strong> % de usuarios que pasan de simulación → solicitud.</li>
+      <li><strong>KPIs:</strong> completion rate, uso del comparador, interacción con modo explicación, CTR del CTA.</li>
+      <li><strong>Hipótesis testeables:</strong> visualización gráfica mejora comprensión · comparar escenarios reduce indecisión · lenguaje simple aumenta confianza.</li>
+      <li><strong>Fuera de alcance:</strong> scoring real, ofertas personalizadas, datos de mercado en vivo (mock por ahora).</li>
+    </ul>
+  </section>
+</main>
+
+
+<script>
+  // ---------- Formatting ----------
+  const fmtMoney = (n) => {
+    if (!isFinite(n)) return "—";
+    return "$ " + Math.round(n).toLocaleString("es-AR");
+  };
+  const fmtPct = (n) => (n * 100).toFixed(1) + "%";
+
+  // ---------- Core math: French amortization ----------
+  // C = P * r(1+r)^n / ((1+r)^n - 1)
+  function calcCuota(monto, plazoMeses, tnaPct) {
+    const r = (tnaPct / 100) / 12;
+    if (r === 0) return monto / plazoMeses;
+    const pow = Math.pow(1 + r, plazoMeses);
+    return monto * (r * pow) / (pow - 1);
+  }
+  function simulate(monto, plazo, tasa) {
+    const cuota = calcCuota(monto, plazo, tasa);
+    const total = cuota * plazo;
+    const interes = total - monto;
+    return { cuota, total, interes };
+  }
+
+  // ---------- Main simulator ----------
+  const monto = document.getElementById("monto");
+  const montoRange = document.getElementById("montoRange");
+  const plazo = document.getElementById("plazo");
+  const plazoRange = document.getElementById("plazoRange");
+  const tasa = document.getElementById("tasa");
+  const tasaRange = document.getElementById("tasaRange");
+
+  const montoLabel = document.getElementById("montoLabel");
+  const plazoLabel = document.getElementById("plazoLabel");
+  const tasaLabel = document.getElementById("tasaLabel");
+
+  const cuotaOut = document.getElementById("cuotaOut");
+  const totalOut = document.getElementById("totalOut");
+  const interesOut = document.getElementById("interesOut");
+  const interesPctOut = document.getElementById("interesPctOut");
+  const legendCapital = document.getElementById("legendCapital");
+  const legendInteres = document.getElementById("legendInteres");
+  const ratio100 = document.getElementById("ratio100");
+
+  // Chart.js doughnut
+  const ctx = document.getElementById("doughnutChart").getContext("2d");
+  const doughnut = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: ["Capital", "Intereses"],
+      datasets: [{
+        data: [1, 0],
+        backgroundColor: ["#5b8cff", "#2dd4bf"],
+        borderColor: "#15203a",
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "68%",
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => `${c.label}: ${fmtMoney(c.parsed)}`
+          }
+        }
+      }
+    }
+  });
+
+  function syncPair(numEl, rangeEl, source) {
+    if (source === "range") numEl.value = rangeEl.value;
+    else {
+      // clamp to range bounds visually
+      const v = Math.max(parseFloat(rangeEl.min), Math.min(parseFloat(rangeEl.max), parseFloat(numEl.value || 0)));
+      rangeEl.value = v;
+    }
+  }
+
+  function update() {
+    const m = parseFloat(monto.value) || 0;
+    const p = parseInt(plazo.value) || 1;
+    const t = parseFloat(tasa.value) || 0;
+
+    montoLabel.textContent = fmtMoney(m);
+    plazoLabel.textContent = `${p} ${p === 1 ? "mes" : "meses"}`;
+    tasaLabel.textContent = `${t}%`;
+
+    const { cuota, total, interes } = simulate(m, p, t);
+    cuotaOut.textContent = fmtMoney(cuota);
+    totalOut.textContent = fmtMoney(total);
+    interesOut.textContent = fmtMoney(interes);
+    interesPctOut.textContent = m > 0 ? `${fmtPct(interes / m)} sobre el capital` : "—";
+
+    legendCapital.textContent = fmtMoney(m);
+    legendInteres.textContent = fmtMoney(interes);
+    ratio100.textContent = m > 0 ? (total / m * 100).toFixed(0) : "—";
+
+    doughnut.data.datasets[0].data = [m, Math.max(interes, 0)];
+    doughnut.update("none");
+  }
+
+  [monto, plazo, tasa].forEach(el => el.addEventListener("input", () => {
+    const map = { monto: montoRange, plazo: plazoRange, tasa: tasaRange };
+    syncPair(el, map[el.id], "input");
+    update();
+  }));
+  [["montoRange", monto], ["plazoRange", plazo], ["tasaRange", tasa]].forEach(([rid, numEl]) => {
+    document.getElementById(rid).addEventListener("input", (e) => {
+      numEl.value = e.target.value;
+      update();
+    });
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    monto.value = montoRange.value = 500000;
+    plazo.value = plazoRange.value = 12;
+    tasa.value = tasaRange.value = 65;
+    update();
+  });
+
+  // ---------- Explain mode ----------
+  document.getElementById("explainToggle").addEventListener("change", (e) => {
+    document.getElementById("explanations").classList.toggle("active", e.target.checked);
+  });
+
+  // ---------- Comparator ----------
+  function readScenario(sc) {
+    const inputs = document.querySelectorAll(`input[data-sc="${sc}"]`);
+    const obj = {};
+    inputs.forEach(i => obj[i.dataset.key] = parseFloat(i.value) || 0);
+    return obj;
+  }
+  function renderScenario(sc) {
+    const { monto, plazo, tasa } = readScenario(sc);
+    const r = simulate(monto, plazo, tasa);
+    document.getElementById(`${sc}_cuota`).textContent = fmtMoney(r.cuota);
+    document.getElementById(`${sc}_total`).textContent = fmtMoney(r.total);
+    document.getElementById(`${sc}_interes`).textContent = fmtMoney(r.interes);
+    return r;
+  }
+  function renderInsight() {
+    const A = renderScenario("A");
+    const B = renderScenario("B");
+    const insight = document.getElementById("insight");
+    if (!isFinite(A.total) || !isFinite(B.total)) { insight.textContent = "—"; return; }
+
+    const cheaper = A.total <= B.total ? "A" : "B";
+    const expensive = cheaper === "A" ? "B" : "A";
+    const diffTotal = Math.abs(A.total - B.total);
+    const diffPct = (diffTotal / Math.min(A.total, B.total)) * 100;
+    const diffCuota = Math.abs(A.cuota - B.cuota);
+    const lowerCuota = A.cuota <= B.cuota ? "A" : "B";
+
+    insight.innerHTML = `
+      <strong>Insight:</strong> El escenario <strong>${cheaper}</strong> es ${fmtMoney(diffTotal)} más barato en total que el ${expensive}
+      (un ${diffPct.toFixed(1)}% menos en costo total).
+      Sin embargo, el escenario <strong>${lowerCuota}</strong> tiene la cuota más baja (diferencia de ${fmtMoney(diffCuota)} por mes).
+      ${cheaper !== lowerCuota ? "<br>👉 Cuota baja no siempre significa crédito barato — revisá el costo total antes de decidir." : ""}
+    `;
+  }
+  document.querySelectorAll('input[data-sc]').forEach(i => i.addEventListener("input", renderInsight));
+
+  // ---------- Inflation module ----------
+  const INFLATION_API = "https://api.argentinadatos.com/v1/finanzas/indices/inflacionInteranual";
+  const INFLATION_MONTHLY_API = "https://api.argentinadatos.com/v1/finanzas/indices/inflacion";
+  const CACHE_KEY = "sim-credito:inflacion-cache";
+  const CACHE_KEY_MONTHLY = "sim-credito:inflacion-mensual-cache";
+  let inflationState = null;        // { valor, fecha } interanual
+  let inflationMonthly = null;      // { annualized, fechaDesde, fechaHasta } 6m anualizada
+  let inflationMode = "yoy";        // "yoy" | "6m" | "manual"
+  let manualInflation = 100;        // % anual, user-editable
+
+  function readCache(key = CACHE_KEY) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+  function writeCache(data, key = CACHE_KEY) {
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        ...data,
+        lastRefresh: new Date().toISOString()
+      }));
+    } catch {}
+  }
+  function shouldRefresh(cached) {
+    if (!cached) return true;
+    const now = new Date();
+    const day15 = new Date(now.getFullYear(), now.getMonth(), 15);
+    const lastRefresh = new Date(cached.lastRefresh);
+    // Refresh only when we're past day-15 of the current month AND
+    // the last refresh happened before day-15 of the current month.
+    // This guarantees at most one API call per month, right after
+    // INDEC publishes new data.
+    return now >= day15 && lastRefresh < day15;
+  }
+  async function fetchInflation() {
+    const res = await fetch(INFLATION_API, { headers: { "Accept": "application/json" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) throw new Error("Empty response");
+    const last = data[data.length - 1];
+    return { valor: Number(last.valor), fecha: last.fecha };
+  }
+  async function getInflation() {
+    const cached = readCache();
+    if (!shouldRefresh(cached)) {
+      return { valor: cached.valor, fecha: cached.fecha };
+    }
+    try {
+      const fresh = await fetchInflation();
+      writeCache(fresh);
+      return fresh;
+    } catch (err) {
+      console.warn("Inflation fetch failed:", err);
+      // Fallback to whatever we have, even if stale
+      if (cached) return { valor: cached.valor, fecha: cached.fecha };
+      throw err;
+    }
+  }
+
+  async function fetchMonthlyInflation() {
+    const res = await fetch(INFLATION_MONTHLY_API, { headers: { "Accept": "application/json" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length < 6) throw new Error("Not enough monthly data");
+    const last6 = data.slice(-6);
+    // Compound: product of (1 + m/100) over 6 months, then annualize: ^(12/6)
+    const prod = last6.reduce((acc, row) => acc * (1 + Number(row.valor) / 100), 1);
+    const annualized = (Math.pow(prod, 12 / 6) - 1) * 100;
+    return {
+      annualized,
+      fechaDesde: last6[0].fecha,
+      fechaHasta: last6[last6.length - 1].fecha
+    };
+  }
+  async function getMonthlyInflation() {
+    const cached = readCache(CACHE_KEY_MONTHLY);
+    if (!shouldRefresh(cached)) {
+      return { annualized: cached.annualized, fechaDesde: cached.fechaDesde, fechaHasta: cached.fechaHasta };
+    }
+    try {
+      const fresh = await fetchMonthlyInflation();
+      writeCache(fresh, CACHE_KEY_MONTHLY);
+      return fresh;
+    } catch (err) {
+      console.warn("Monthly inflation fetch failed:", err);
+      if (cached) return { annualized: cached.annualized, fechaDesde: cached.fechaDesde, fechaHasta: cached.fechaHasta };
+      throw err;
+    }
+  }
+
+  function formatInflaDate(isoDate) {
+    // "2026-02-28" -> "feb 2026"
+    const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const [y, m] = isoDate.split("-");
+    return `${months[parseInt(m, 10) - 1]} ${y}`;
+  }
+
+  function getActiveInflation() {
+    if (inflationMode === "manual") {
+      return {
+        valor: manualInflation,
+        label: "Inflación anual (manual)",
+        dateText: "Valor ingresado por vos"
+      };
+    }
+    if (inflationMode === "6m") {
+      if (!inflationMonthly) return null;
+      return {
+        valor: inflationMonthly.annualized,
+        label: "Inflación anualizada (últ. 6 meses)",
+        dateText: `Proyección · ${formatInflaDate(inflationMonthly.fechaDesde)} → ${formatInflaDate(inflationMonthly.fechaHasta)}`
+      };
+    }
+    // yoy (default)
+    if (!inflationState) return null;
+    return {
+      valor: inflationState.valor,
+      label: "Inflación interanual",
+      dateText: `Último dato: ${formatInflaDate(inflationState.fecha)}`
+    };
+  }
+
+  function renderInflationModule() {
+    const active = getActiveInflation();
+    if (!active) return;
+    const inflaPct = active.valor;
+    const tnaPct = parseFloat(tasa.value) || 0;
+
+    document.getElementById("inflaLabel").textContent = active.label;
+    document.getElementById("inflaValue").textContent = `${inflaPct.toFixed(1)}%`;
+    document.getElementById("inflaDate").textContent = active.dateText;
+
+    // Scale: 0 to max(tna, infla) * 1.1, with a floor of 20% so tiny values still look reasonable
+    const maxVal = Math.max(tnaPct, inflaPct, 20) * 1.1;
+    document.getElementById("barScaleMax").textContent = `${Math.round(maxVal)}%`;
+
+    const tnaPos = Math.min(100, Math.max(0, (tnaPct / maxVal) * 100));
+    const inflaPos = Math.min(100, Math.max(0, (inflaPct / maxVal) * 100));
+
+    document.getElementById("markerTna").style.left = `${tnaPos}%`;
+    document.getElementById("markerInfla").style.left = `${inflaPos}%`;
+    document.getElementById("markerTnaLabel").textContent = `${tnaPct}%`;
+    document.getElementById("markerInflaLabel").textContent = `${inflaPct.toFixed(1)}%`;
+
+    // Verdict
+    const diff = tnaPct - inflaPct;
+    const verdictEl = document.getElementById("verdict");
+    verdictEl.classList.remove("green", "yellow", "red");
+
+    let color, emoji, msg;
+    if (diff < 0) {
+      color = "green"; emoji = "🟢";
+      msg = `Tu tasa está <strong>${Math.abs(diff).toFixed(1)} puntos por debajo</strong> de la inflación. En términos reales, el crédito es "barato": los precios suben más rápido de lo que crece tu deuda.`;
+    } else if (diff < 15) {
+      color = "yellow"; emoji = "🟡";
+      msg = `Tu tasa está <strong>en línea con la inflación</strong> (${diff.toFixed(1)} puntos por encima). El costo real del crédito es bajo, pero no despreciable.`;
+    } else {
+      color = "red"; emoji = "🔴";
+      msg = `Tu tasa está <strong>${diff.toFixed(1)} puntos por encima</strong> de la inflación. En términos reales, el crédito es caro: vas a devolver bastante más poder adquisitivo del que recibiste.`;
+    }
+    verdictEl.classList.add(color);
+    verdictEl.innerHTML = `${emoji} ${msg}`;
+  }
+
+  async function initInflation() {
+    try {
+      inflationState = await getInflation();
+      document.getElementById("inflationModule").hidden = false;
+      renderInflationModule();
+    } catch (err) {
+      console.warn("Inflation module unavailable:", err);
+      document.getElementById("inflationFallback").hidden = false;
+    }
+  }
+
+  // Mode selector wiring
+  const inflaManualWrap = document.getElementById("inflaManualWrap");
+  const inflaManualInput = document.getElementById("inflaManualInput");
+
+  async function setInflationMode(mode) {
+    inflationMode = mode;
+    inflaManualWrap.classList.toggle("active", mode === "manual");
+
+    if (mode === "6m" && !inflationMonthly) {
+      // Show a quick loading hint in the value field
+      document.getElementById("inflaValue").textContent = "…";
+      document.getElementById("inflaDate").textContent = "Calculando últimos 6 meses…";
+      try {
+        inflationMonthly = await getMonthlyInflation();
+      } catch (err) {
+        console.warn("Could not load monthly inflation, reverting to interanual:", err);
+        document.getElementById("inflaDate").textContent = "No se pudo obtener inflación mensual.";
+        // Revert UI to yoy
+        document.getElementById("inflaMode_yoy").checked = true;
+        inflationMode = "yoy";
+      }
+    }
+    renderInflationModule();
+  }
+
+  document.querySelectorAll('input[name="inflaMode"]').forEach(r => {
+    r.addEventListener("change", (e) => {
+      if (e.target.checked) setInflationMode(e.target.value);
+    });
+  });
+  inflaManualInput.addEventListener("input", (e) => {
+    const v = parseFloat(e.target.value);
+    if (isFinite(v)) {
+      manualInflation = v;
+      if (inflationMode === "manual") renderInflationModule();
+    }
+  });
+
+  // Hook into the main update() so the TNA marker tracks the slider live
+  const _originalUpdate = update;
+  update = function() {
+    _originalUpdate();
+    if (inflationState || inflationMode === "manual") renderInflationModule();
+  };
+
+  // ---------- Init ----------
+  update();
+  renderInsight();
+  initInflation();
+</script>
+</body>
+</html>
