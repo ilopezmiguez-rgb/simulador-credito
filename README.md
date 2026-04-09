@@ -12,13 +12,13 @@ Archivo único: `index.html`. Abrir en cualquier navegador moderno, sin dependen
 - **Visualización de costos** — gráfico de dona (Chart.js) que desglosa capital vs. intereses y muestra cuánto se devuelve por cada $100 recibidos.
 - **Modo explicación** — panel desplegable con definiciones simples de cuota, TNA, tasa real y sistema francés.
 - **Comparador de escenarios** — compará dos combinaciones de monto/plazo/tasa lado a lado con insight automático sobre la diferencia real.
-- **Módulo Tasa vs. Inflación** — consume la API de ArgentinaDatos (INDEC) para contrastar la TNA con la inflación interanual, anualizada a 6 meses, o un valor manual. Incluye caché local y fallback si la API no responde.
+- **Módulo Tasa vs. Inflación** — contrasta la TNA con la inflación (interanual, anualizada a 6 meses o un valor manual) usando una barra visual y un veredicto de "tasa real". Utiliza un bloque de datos estáticos precargados de ArgentinaDatos (INDEC) generados previamente vía script, garantizando su funcionamiento offline y sin depender de llamadas a APIs externas en tiempo real.
 
 ## Stack
 
 - HTML + CSS + JavaScript vanilla
 - [Chart.js 4.4](https://www.chartjs.org/) (CDN)
-- API pública: ArgentinaDatos · INDEC
+- Datos de inflación: ArgentinaDatos · INDEC (cacheados estáticamente en el código)
 
 ## Notas del producto
 
@@ -38,4 +38,4 @@ Este simulador valida la hipótesis de que **mayor transparencia en el costo del
 **Fuera de alcance (v1):**
 - Scoring real
 - Ofertas personalizadas
-- Datos de mercado en vivo (mock por ahora)
+- Llamadas a APIs de mercado en vivo en el cliente (se utilizan datos estáticos por ahora)
