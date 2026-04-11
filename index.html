@@ -211,10 +211,11 @@
     margin-bottom: 6px;
   }
   .result-value {
-    font-size: 22px;
+    font-size: clamp(14px, 2.5vw, 22px);
     font-weight: 700;
     letter-spacing: -.5px;
     font-family: "Space Mono", monospace;
+    white-space: nowrap;
   }
   .result-tile small {
     display: block;
@@ -741,6 +742,14 @@
         <p class="field-warn" id="tnaWarn">Tasa muy alta. A esta TNA el costo del crédito es extremo — revisá si el valor es correcto antes de simular.</p>
       </div>
 
+      <div class="field" style="margin-top: 20px; padding: 12px; background: var(--bg-2); border-radius: 10px; border: 1px dashed var(--border);">
+        <label class="explain-toggle">
+          <input type="checkbox" id="modoRealista" checked />
+          <span class="switch"></span>
+          <span style="font-size: 13px; font-weight: 600;">Modo Realista (IVA + Seguros)</span>
+        </label>
+      </div>
+
       <div class="results">
         <div class="result-tile primary">
           <div class="result-label">Cuota mensual</div>
@@ -784,8 +793,8 @@
               <span class="legend-dot" style="background: var(--interes)"></span>
               <span>Intereses: <strong id="legendInteres">—</strong></span>
             </div>
-            <div class="legend-item" style="color: var(--muted); margin-top: 10px;">
-              Por cada $100 que recibís, devolvés $<span id="ratio100">—</span>
+            <div style="color: var(--muted); margin-top: 12px; font-size: 13px; line-height: 1.4;">
+              Por cada $100 que recibís, <span style="white-space: nowrap;">devolvés <strong>$<span id="ratio100">—</span></strong></span>
             </div>
           </div>
         </div>
@@ -798,26 +807,6 @@
       </label>
 
       <div class="explanations" id="explanations">
-        <div class="explain-card">
-          <h3>¿Qué es la cuota?</h3>
-          <p>Es el monto fijo que pagás cada mes. Incluye una parte de devolución del dinero prestado (capital) y los intereses por usarlo.</p>
-        </div>
-        <div class="explain-card">
-          <h3>¿Qué es la TNA?</h3>
-          <p>Tasa Nominal Anual: el costo del crédito expresado por año. Para calcular la mensual la dividimos entre 12.</p>
-        </div>
-        <div class="explain-card">
-          <h3>¿Por qué pago más que el monto?</h3>
-          <p>Porque pagás intereses por el tiempo que usás el dinero. A mayor plazo, más intereses, aunque la cuota sea menor.</p>
-        </div>
-        <div class="explain-card">
-          <h3>Sistema francés</h3>
-          <p>Las cuotas son iguales todos los meses. Al principio pagás más interés y menos capital; al final, al revés.</p>
-        </div>
-        <div class="explain-card">
-          <h3>¿Qué es la tasa real?</h3>
-          <p>Es la tasa de interés menos la inflación. Si tu crédito tiene 60% anual y los precios suben 100% al año, en términos reales estás pagando menos de lo que recibiste. Mirar solo la tasa nominal puede engañar.</p>
-        </div>
       </div>
     </section>
   </div>
@@ -901,7 +890,7 @@
         <div class="bar-track"></div>
         <div class="marker marker-tna" id="markerTna">
           <div class="marker-dot"></div>
-          <div class="marker-label">TNA<br><strong id="markerTnaLabel">—</strong></div>
+          <div class="marker-label" id="markerTnaLabel">CFTEA<br><strong>—</strong></div>
         </div>
         <div class="marker marker-infla" id="markerInfla">
           <div class="marker-dot"></div>
@@ -923,6 +912,33 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  const EXPLICACIONES_FASE2 = [
+    {
+      titulo: "¿Qué es el CFTEA?",
+      cuerpo: "Es el Costo Financiero Total Efectivo Anual. Incluye intereses, impuestos (IVA), seguros y comisiones. Es el número real que debés mirar para comparar préstamos."
+    },
+    {
+      titulo: "El impacto del IVA",
+      cuerpo: "Los intereses gravan un 21% de IVA para consumidores finales. El simulador desglosa este impuesto para que veas qué parte de tu cuota va al fisco y no al banco."
+    },
+    {
+      titulo: "TNA vs. TEA",
+      cuerpo: "La TNA es informativa. La TEA es la tasa real por capitalizar intereses mes a mes. Sumando impuestos y seguros a la TEA, obtenés el CFTEA final."
+    },
+    {
+      titulo: "Seguros de Vida",
+      cuerpo: "Cubre el saldo deudor en caso de fallecimiento. Se calcula como una alícuota (ej. 0.2%) sobre el capital que aún debés, sumando pesos extra a la cuota."
+    },
+    {
+      titulo: "Tasa Real (vs Inflación)",
+      cuerpo: "Si el CFTEA es menor a la inflación, el crédito se 'licúa'. Si el CFTEA es mayor, estás devolviendo más poder adquisitivo del que recibiste."
+    },
+    {
+      titulo: "Efecto Francés + IVA",
+      cuerpo: "Al principio pagás más intereses y, por ende, más IVA. A medida que cancelás capital, el componente impositivo de la cuota baja gradualmente."
+    }
+  ];
+
   // ---------- Formatting ----------
   const fmtMoney = (n) => {
     if (!isFinite(n)) return "—";
@@ -932,17 +948,29 @@
 
   // ---------- Core math: French amortization ----------
   // C = P * r(1+r)^n / ((1+r)^n - 1)
-  function calcCuota(monto, plazoMeses, tnaPct) {
-    const r = (tnaPct / 100) / 12;
+  function calcCuota(monto, plazoMeses, tnaPct, conIva = false) {
+    let tasaAnual = tnaPct / 100;
+    if (conIva) tasaAnual *= 1.21; // IVA sobre interés
+
+    const r = tasaAnual / 12; // Tasa mensual cargada (i')
     if (r === 0) return monto / plazoMeses;
+    
     const pow = Math.pow(1 + r, plazoMeses);
     return monto * (r * pow) / (pow - 1);
   }
-  function simulate(monto, plazo, tasa) {
-    const cuota = calcCuota(monto, plazo, tasa);
-    const total = cuota * plazo;
+
+  function simulate(monto, plazo, tasa, conIva = false, alicuotaSeguro = 0.2) {
+    const cuotaBase = calcCuota(monto, plazo, tasa, conIva);
+    const seguroMensual = monto * (alicuotaSeguro / 100); // Seguro simplificado
+    const cuotaTotal = cuotaBase + seguroMensual;
+    const total = cuotaTotal * plazo;
     const interes = total - monto;
-    return { cuota, total, interes };
+    
+    // Cálculo de CFTEA para transparencia
+    const tasaMensualCargada = (tasa / 12 / 100) * (conIva ? 1.21 : 1);
+    const cftea = (Math.pow(1 + tasaMensualCargada, 12) - 1) * 100;
+
+    return { cuota: cuotaTotal, total, interes, cftea: cftea.toFixed(2) };
   }
 
   // ---------- Main simulator ----------
@@ -970,10 +998,10 @@
   const doughnut = new Chart(ctx, {
     type: "doughnut",
     data: {
-      labels: ["Capital", "Intereses"],
+      labels: ["Capital", "Interés Neto", "Impuestos/Seguros"],
       datasets: [{
-        data: [1, 0],
-        backgroundColor: ["#e8642a", "#f0b429"],
+        data: [500000, 133970, 0],
+        backgroundColor: ["#e8642a", "#f0b429", "#4a5568"],
         borderColor: "#201c16",
         borderWidth: 3,
       }]
@@ -1010,10 +1038,10 @@
     const m = parseFloat(monto.value) || 0;
     const p = parseInt(plazo.value)   || 0;
     const t = parseFloat(tasa.value)  || 0;
+    const modoRealista = document.getElementById("modoRealista").checked;
 
     montoLabel.textContent = fmtMoney(m);
     plazoLabel.textContent = p > 0 ? `${p} ${p === 1 ? "mes" : "meses"}` : "—";
-    tasaLabel.textContent  = `${t}%`;
 
     // Inline validation
     const montoInvalid = m <= 0;
@@ -1025,16 +1053,20 @@
     tnaWarn.classList.toggle("visible", t > 150);
 
     if (montoInvalid || plazoInvalid) {
+      tasaLabel.textContent  = `${t}%`;
       cuotaOut.textContent = totalOut.textContent = interesOut.textContent = "—";
       interesPctOut.textContent = "—";
       legendCapital.textContent = legendInteres.textContent = "—";
       ratio100.textContent = "—";
-      doughnut.data.datasets[0].data = [1, 0];
+      doughnut.data.datasets[0].data = [1, 0, 0];
       doughnut.update("none");
       return;
     }
 
-    const { cuota, total, interes } = simulate(m, p, t);
+    const { cuota, total, interes, cftea } = simulate(m, p, t, modoRealista, 0.2);
+    
+    tasaLabel.innerHTML = `${t}% <small style="color:var(--accent); margin-left: 6px;">CFTEA: ${cftea}%</small>`;
+
     cuotaOut.textContent = fmtMoney(cuota);
     totalOut.textContent = fmtMoney(total);
     interesOut.textContent = fmtMoney(interes);
@@ -1044,9 +1076,25 @@
     legendInteres.textContent = fmtMoney(interes);
     ratio100.textContent = (total / m * 100).toFixed(0);
 
-    doughnut.data.datasets[0].data = [m, Math.max(interes, 0)];
+    const montoIva = modoRealista ? (interes * 0.18) : 0; 
+    const interesNeto = interes - montoIva;
+
+    doughnut.data.datasets[0].data = [m, Math.max(interesNeto, 0), Math.max(montoIva, 0)];
+    doughnut.data.datasets[0].backgroundColor = ["#e8642a", "#f0b429", "#4a5568"];
     doughnut.update("none");
   }
+
+  document.getElementById("modoRealista").addEventListener("change", (e) => {
+    if (e.target.checked) {
+      // Si activa el modo realista, resaltamos la tarjeta de CFTEA e IVA
+      const explainToggle = document.getElementById("explainToggle");
+      if (!explainToggle.checked) {
+        explainToggle.click(); // Abre el modo explicación automáticamente
+        showToast("Se activaron las definiciones de costo real");
+      }
+    }
+    update();
+  });
 
   [monto, plazo, tasa].forEach(el => el.addEventListener("input", () => {
     const map = { monto: montoRange, plazo: plazoRange, tasa: tasaRange };
@@ -1085,7 +1133,8 @@
   }
   function renderScenario(sc) {
     const { monto, plazo, tasa } = readScenario(sc);
-    const r = simulate(monto, plazo, tasa);
+    const modoRealista = document.getElementById("modoRealista")?.checked || false;
+    const r = simulate(monto, plazo, tasa, modoRealista, 0.2);
     document.getElementById(`${sc}_cuota`).textContent = fmtMoney(r.cuota);
     document.getElementById(`${sc}_total`).textContent = fmtMoney(r.total);
     document.getElementById(`${sc}_interes`).textContent = fmtMoney(r.interes);
@@ -1210,40 +1259,46 @@
     const active = getActiveInflation();
     if (!active) return;
     const inflaPct = active.valor;
-    const tnaPct = parseFloat(tasa.value) || 0;
+    
+    const t = parseFloat(tasa.value) || 0;
+    const m = parseFloat(monto.value) || 0;
+    const p = parseInt(plazo.value)   || 0;
+    const modoRealista = document.getElementById("modoRealista").checked;
+    const { cftea } = simulate(m, p, t, modoRealista, 0.2);
+    const cfteaValue = parseFloat(cftea) || 0;
 
     document.getElementById("inflaLabel").textContent = active.label;
     document.getElementById("inflaValue").textContent = `${inflaPct.toFixed(1)}%`;
     document.getElementById("inflaDate").textContent = active.dateText;
     document.getElementById("inflaSource").hidden = (inflationMode === "manual");
 
-    // Scale: 0 to max(tna, infla) * 1.1, with a floor of 20% so tiny values still look reasonable
-    const maxVal = Math.max(tnaPct, inflaPct, 20) * 1.1;
+    // Scale: 0 to max(cftea, infla) * 1.1, with a floor of 20% so tiny values still look reasonable
+    const maxVal = Math.max(cfteaValue, inflaPct, 20) * 1.1;
     document.getElementById("barScaleMax").textContent = `${Math.round(maxVal)}%`;
 
-    const tnaPos = Math.min(100, Math.max(0, (tnaPct / maxVal) * 100));
+    const cfteaPos = Math.min(100, Math.max(0, (cfteaValue / maxVal) * 100));
     const inflaPos = Math.min(100, Math.max(0, (inflaPct / maxVal) * 100));
 
-    document.getElementById("markerTna").style.left = `${tnaPos}%`;
+    document.getElementById("markerTna").style.left = `${cfteaPos}%`;
     document.getElementById("markerInfla").style.left = `${inflaPos}%`;
-    document.getElementById("markerTnaLabel").textContent = `${tnaPct}%`;
+    document.getElementById("markerTnaLabel").innerHTML = `CFTEA<br><strong>${cfteaValue}%</strong>`;
     document.getElementById("markerInflaLabel").textContent = `${inflaPct.toFixed(1)}%`;
 
     // Verdict
-    const diff = tnaPct - inflaPct;
+    const diffReal = cfteaValue - inflaPct;
     const verdictEl = document.getElementById("verdict");
     verdictEl.classList.remove("green", "yellow", "red");
 
-    let color, emoji, msg;
-    if (diff < 0) {
-      color = "green"; emoji = "🟢";
-      msg = `Tu tasa está <strong>${Math.abs(diff).toFixed(1)} puntos por debajo</strong> de la inflación. En términos reales, el crédito es "barato": los precios suben más rápido de lo que crece tu deuda.`;
-    } else if (diff < 15) {
-      color = "yellow"; emoji = "🟡";
-      msg = `Tu tasa está <strong>en línea con la inflación</strong> (${diff.toFixed(1)} puntos por encima). El costo real del crédito es bajo, pero no despreciable.`;
+    let color, msg;
+    if (diffReal < 0) {
+      color = "green";
+      msg = `El costo financiero (CFTEA) está <strong>${Math.abs(diffReal).toFixed(1)} puntos por debajo</strong> de la inflación. En términos reales, el crédito es "barato": los precios suben más rápido de lo que crece tu deuda.`;
+    } else if (diffReal < 15) {
+      color = "yellow";
+      msg = `El costo financiero (CFTEA) está <strong>en línea con la inflación</strong> (${diffReal.toFixed(1)} puntos por encima). El costo real del crédito es bajo, pero no despreciable.`;
     } else {
-      color = "red"; emoji = "🔴";
-      msg = `Tu tasa está <strong>${diff.toFixed(1)} puntos por encima</strong> de la inflación. En términos reales, el crédito es caro: vas a devolver bastante más poder adquisitivo del que recibiste.`;
+      color = "red";
+      msg = `El costo financiero (CFTEA) está <strong>${diffReal.toFixed(1)} puntos por encima</strong> de la inflación. En términos reales, el crédito es caro: vas a devolver bastante más poder adquisitivo del que recibiste.`;
     }
     verdictEl.classList.add(color);
     verdictEl.innerHTML = msg;
@@ -1340,6 +1395,19 @@
   });
 
   // ---------- Init ----------
+  function renderExplanations() {
+    const container = document.getElementById("explanations");
+    container.innerHTML = EXPLICACIONES_FASE2.map(exp => `
+      <div class="explain-card">
+        <h3>${exp.titulo}</h3>
+        <p>${exp.cuerpo}</p>
+      </div>
+    `).join('');
+  }
+
+  // Llamar a la función al cargar la página
+  renderExplanations();
+
   update();
   renderInsight();
   renderInflationModule();
